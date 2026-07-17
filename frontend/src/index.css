@@ -503,3 +503,45 @@ dd { margin: 0; font-weight: 600; font-size: 13px; }
   padding: 10px 20px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer;
 }
 .admin-form-actions button[type="submit"] { background: var(--accent); color: #111; font-weight: 600; border: none; }
+
+/* ---------- Onboarding: 5-question picture flow ---------- */
+.onboarding-screen {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.onboarding-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  padding: 40px; width: 100%; max-width: 480px; text-align: center;
+}
+.onboarding-progress { display: flex; gap: 8px; justify-content: center; margin-bottom: 24px; }
+.onboarding-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); }
+.onboarding-dot.filled { background: var(--accent); }
+
+.onboarding-step h2 { margin-top: 0; }
+
+.onboarding-options {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 12px; margin: 24px 0;
+}
+.onboarding-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  background: var(--bg); border: 2px solid var(--border); border-radius: 12px;
+  padding: 16px 8px; cursor: pointer; color: var(--text); transition: border-color 0.15s, transform 0.1s;
+}
+.onboarding-tile:hover { border-color: var(--accent); transform: translateY(-2px); }
+.onboarding-tile.selected { border-color: var(--accent); background: rgba(245,166,35,0.1); }
+.onboarding-icon { font-size: 32px; }
+.onboarding-swatch {
+  width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--border); display: block;
+}
+
+.onboarding-continue, .onboarding-skip {
+  border-radius: 8px; cursor: pointer;
+}
+.onboarding-continue {
+  width: 100%; padding: 12px; background: var(--accent); color: #111; font-weight: 600; border: none; margin-top: 8px;
+}
+.onboarding-continue:disabled { opacity: 0.4; cursor: not-allowed; }
+.onboarding-skip {
+  background: none; border: none; color: var(--text-muted); font-size: 13px; margin-top: 16px;
+  text-decoration: underline;
+}

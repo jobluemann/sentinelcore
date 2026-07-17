@@ -4,10 +4,11 @@ import AssetCard from './components/AssetCard.jsx'
 import AssetPanel from './components/AssetPanel.jsx'
 import AssetPage from './components/AssetPage.jsx'
 import Login from './components/Login.jsx'
+import Onboarding from './components/Onboarding.jsx'
 import TopCarousel from './components/TopCarousel.jsx'
 import AffiliateBanner from './components/AffiliateBanner.jsx'
 import AdminCreatives from './components/AdminCreatives.jsx'
-import { getTicker } from './api/client.js'
+import { getTicker, getOnboardingStatus } from './api/client.js'
 import { auth } from './firebase.js'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
 
@@ -18,6 +19,8 @@ export default function App() {
   const [filter, setFilter] = useState('all')
   const [session, setSession] = useState(null)
   const [authChecked, setAuthChecked] = useState(false)
+  const [needsOnboarding, setNeedsOnboarding] = useState(false)
+  const [onboardingChecked, setOnboardingChecked] = useState(false)
 
   // Simple hash-based route for the admin creatives page — no router dependency needed.
   // Visit yoursite.com/#admin to reach it.
@@ -42,6 +45,19 @@ export default function App() {
     return () => clearInterval(interval)
   }, [])
 
+  useEffect(() => {
+    if (!session) return
+    let cancelled = false
+    auth.currentUser?.getIdToken().then((idToken) =>
+      getOnboardingStatus(idToken).then((status) => {
+        if (cancelled) return
+        setNeedsOnboarding(!(status?.completed))
+        setOnboardingChecked(true)
+      })
+    )
+    return () => { cancelled = true }
+  }, [session])
+
   const filtered = filter === 'all' ? assets : assets.filter((a) => a.asset_class === filter)
 
   // Admin route is separate from the logged-in dashboard — protected by the
@@ -56,6 +72,10 @@ export default function App() {
 
   if (!session) {
     return <Login onLoggedIn={setSession} />
+  }
+
+  if (session && onboardingChecked && needsOnboarding) {
+    return <Onboarding onComplete={() => setNeedsOnboarding(false)} />
   }
 
   if (pageAsset) {

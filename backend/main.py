@@ -205,6 +205,57 @@ async def affiliate_links(symbol: Optional[str] = None, asset_class: Optional[st
 
 
 # ──────────────────────────────────────────────────────────────
+# ONBOARDING — 5 quick questions asked once, right after first sign-in
+# ──────────────────────────────────────────────────────────────
+class OnboardingAnswers(BaseModel):
+    gender: Optional[str] = None
+    age_range: Optional[str] = None
+    favorite_color: Optional[str] = None
+    favorite_pet: Optional[str] = None
+    asset_preferences: list[str] = []
+
+
+@app.get("/api/onboarding/status")
+async def onboarding_status(user=Depends(get_current_user)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT id FROM user_onboarding WHERE user_id = $1", user["id"])
+        return {"completed": row is not None}
+
+
+@app.post("/api/onboarding")
+async def save_onboarding(req: OnboardingAnswers, user=Depends(get_current_user)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            INSERT INTO user_onboarding (user_id, email, gender, age_range, favorite_color, favorite_pet, asset_preferences)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (user_id) DO UPDATE SET
+                gender = EXCLUDED.gender,
+                age_range = EXCLUDED.age_range,
+                favorite_color = EXCLUDED.favorite_color,
+                favorite_pet = EXCLUDED.favorite_pet,
+                asset_preferences = EXCLUDED.asset_preferences,
+                completed_at = now()
+            RETURNING *
+            """,
+            user["id"], user["email"], req.gender, req.age_range,
+            req.favorite_color, req.favorite_pet, req.asset_preferences,
+        )
+        return dict(row)
+
+
+@app.get("/api/admin/onboarding-responses")
+async def admin_onboarding_responses(_=Depends(require_admin_key)):
+    """All users' onboarding answers — for your own review/analysis."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("SELECT * FROM user_onboarding ORDER BY completed_at DESC")
+        return [dict(r) for r in rows]
+
+
+# ──────────────────────────────────────────────────────────────
 # AFFILIATE CREATIVES — swappable banners + top carousel
 # Public read endpoint for the frontend, admin CRUD for managing them.
 # ──────────────────────────────────────────────────────────────

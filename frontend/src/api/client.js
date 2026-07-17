@@ -89,6 +89,21 @@ export function adminDeleteCreative(adminKey, id) {
   return adminFetch(`/admin/creatives/${id}`, adminKey, { method: 'DELETE' })
 }
 
+// ---------- Onboarding ----------
+export async function getOnboardingStatus(token) {
+  return safeFetch('/onboarding/status', { headers: { Authorization: `Bearer ${token}` } })
+}
+
+export async function saveOnboarding(token, answers) {
+  const res = await fetch(`${BASE}/onboarding`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(answers),
+  })
+  if (!res.ok) throw new Error(`Save failed (${res.status})`)
+  return res.json()
+}
+
 export async function getPortfolio(token) {
   return safeFetch('/demo/portfolio', {
     headers: { Authorization: `Bearer ${token}` },
