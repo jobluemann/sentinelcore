@@ -9,12 +9,6 @@ Sources:
   - commodities -> yfinance (futures tickers, e.g. GC=F, CL=F)
   - forex       -> yfinance (pairs, e.g. EURUSD=X)
   - crypto      -> CoinGecko (more reliable than yfinance for crypto)
-
-NOTE: This file was written without live network access to Yahoo Finance
-or CoinGecko (sandboxed dev environment only allows a fixed domain
-allowlist). The HTTP/library calls are correct and tested for shape, but
-run a real fetch on your own machine before trusting it in production:
-  python -m backend.services.price_fetcher --once
 """
 import asyncio
 import argparse
@@ -45,17 +39,17 @@ async def fetch_yfinance_symbol(symbol: str) -> Optional[dict]:
         ticker = yf.Ticker(symbol)
         info = ticker.fast_info  # lighter/faster than .info, fewer rate-limit issues
 
-        price = float(info.get("last_price") or 0)
-        prev_close = float(info.get("previous_close") or 0)
+        price = float(getattr(info, "last_price", None) or 0)
+        prev_close = float(getattr(info, "previous_close", None) or 0)
         change_pct = ((price - prev_close) / prev_close * 100) if prev_close else 0.0
 
         return {
             "symbol": symbol,
             "price": price,
             "change_pct": round(change_pct, 4),
-            "volume": int(info.get("last_volume") or 0) or None,
-            "week52_low": float(info.get("year_low") or 0) or None,
-            "week52_high": float(info.get("year_high") or 0) or None,
+            "volume": int(getattr(info, "last_volume", None) or 0) or None,
+            "week52_low": float(getattr(info, "year_low", None) or 0) or None,
+            "week52_high": float(getattr(info, "year_high", None) or 0) or None,
         }
     except Exception as e:
         print(f"[price_fetcher] yfinance failed for {symbol}: {e}")
