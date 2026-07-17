@@ -4,6 +4,9 @@ import AssetCard from './components/AssetCard.jsx'
 import AssetPanel from './components/AssetPanel.jsx'
 import AssetPage from './components/AssetPage.jsx'
 import Login from './components/Login.jsx'
+import TopCarousel from './components/TopCarousel.jsx'
+import AffiliateBanner from './components/AffiliateBanner.jsx'
+import AdminCreatives from './components/AdminCreatives.jsx'
 import { getTicker } from './api/client.js'
 import { auth } from './firebase.js'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
@@ -15,6 +18,15 @@ export default function App() {
   const [filter, setFilter] = useState('all')
   const [session, setSession] = useState(null)
   const [authChecked, setAuthChecked] = useState(false)
+
+  // Simple hash-based route for the admin creatives page — no router dependency needed.
+  // Visit yoursite.com/#admin to reach it.
+  const [isAdminRoute, setIsAdminRoute] = useState(window.location.hash === '#admin')
+  useEffect(() => {
+    const onHashChange = () => setIsAdminRoute(window.location.hash === '#admin')
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -32,6 +44,12 @@ export default function App() {
 
   const filtered = filter === 'all' ? assets : assets.filter((a) => a.asset_class === filter)
 
+  // Admin route is separate from the logged-in dashboard — protected by the
+  // admin key you enter on that page, not by Firebase login.
+  if (isAdminRoute) {
+    return <AdminCreatives />
+  }
+
   if (!authChecked) {
     return <div className="loading-screen">Loading...</div>
   }
@@ -41,7 +59,9 @@ export default function App() {
   }
 
   if (pageAsset) {
-    return <AssetPage asset={pageAsset} onBack={() => setPageAsset(null)} />
+    return (
+      <AssetPage asset={pageAsset} onBack={() => setPageAsset(null)} />
+    )
   }
 
   return (
@@ -58,6 +78,8 @@ export default function App() {
         </div>
       </header>
 
+      <TopCarousel />
+
       <TickerStrip items={assets} />
 
       <div className="filter-bar">
@@ -68,11 +90,20 @@ export default function App() {
         ))}
       </div>
 
-      <main className="asset-grid">
-        {filtered.map((asset) => (
-          <AssetCard key={asset.symbol} asset={asset} onClick={setPanelAsset} />
-        ))}
-      </main>
+      <div className="dashboard-layout">
+        <main className="asset-grid">
+          {filtered.map((asset) => (
+            <AssetCard key={asset.symbol} asset={asset} onClick={setPanelAsset} />
+          ))}
+        </main>
+        <aside className="side-rail">
+          <AffiliateBanner zone="side_banner" assetClass={filter === 'all' ? null : filter} />
+        </aside>
+      </div>
+
+      <footer className="dashboard-footer">
+        <AffiliateBanner zone="bottom_banner" assetClass={filter === 'all' ? null : filter} />
+      </footer>
 
       <AssetPanel
         asset={panelAsset}

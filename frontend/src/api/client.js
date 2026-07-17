@@ -1,4 +1,8 @@
-const BASE = '/api'
+// In local dev, Vite's server proxy forwards '/api' to Render (see vite.config.js),
+// so a relative path works. In a static production build (e.g. hosted on SiteGround),
+// there's no proxy, so we need the full Render URL instead. Set VITE_API_BASE_URL
+// at build time (see .env.production) to point at the live backend.
+const BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
 const MOCK_TICKER = [
   { symbol: 'AAPL', name: 'Apple Inc.', asset_class: 'stock', price: 224.31, change_pct: 1.2 },
@@ -47,6 +51,42 @@ export async function getTicker() {
 export async function getAffiliateLinks(symbol, assetClass) {
   const data = await safeFetch(`/affiliate-links?symbol=${symbol}&asset_class=${assetClass}`)
   return data ?? MOCK_AFFILIATES[assetClass] ?? []
+}
+
+// ---------- Affiliate creatives (banners + top carousel) ----------
+export async function getCreatives(zone, assetClass, symbol) {
+  const params = new URLSearchParams()
+  if (zone) params.set('zone', zone)
+  if (assetClass) params.set('asset_class', assetClass)
+  if (symbol) params.set('symbol', symbol)
+  const data = await safeFetch(`/creatives?${params.toString()}`)
+  return data ?? []
+}
+
+// ---------- Admin: manage creatives (requires X-Admin-Key) ----------
+async function adminFetch(path, adminKey, opts = {}) {
+  const res = await fetch(`${BASE}${path}`, {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Key': adminKey, ...(opts.headers || {}) },
+  })
+  if (!res.ok) throw new Error(`Admin request failed (${res.status})`)
+  return res.json()
+}
+
+export function adminListCreatives(adminKey) {
+  return adminFetch('/admin/creatives', adminKey)
+}
+
+export function adminCreateCreative(adminKey, creative) {
+  return adminFetch('/admin/creatives', adminKey, { method: 'POST', body: JSON.stringify(creative) })
+}
+
+export function adminUpdateCreative(adminKey, id, creative) {
+  return adminFetch(`/admin/creatives/${id}`, adminKey, { method: 'PUT', body: JSON.stringify(creative) })
+}
+
+export function adminDeleteCreative(adminKey, id) {
+  return adminFetch(`/admin/creatives/${id}`, adminKey, { method: 'DELETE' })
 }
 
 export async function getPortfolio(token) {

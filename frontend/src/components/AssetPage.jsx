@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { getAffiliateLinks } from '../api/client'
+import TopCarousel from './TopCarousel.jsx'
+import AffiliateBanner from './AffiliateBanner.jsx'
 
 export default function AssetPage({ asset, onBack }) {
   const [affiliates, setAffiliates] = useState([])
@@ -15,6 +17,8 @@ export default function AssetPage({ asset, onBack }) {
   return (
     <div className="asset-page">
       <button className="back-link" onClick={onBack}>← Back to dashboard</button>
+
+      <TopCarousel assetClass={asset.asset_class} symbol={asset.symbol} />
 
       <div className="asset-page-header">
         <div>
@@ -62,6 +66,10 @@ export default function AssetPage({ asset, onBack }) {
           ))}
         </section>
       </div>
+
+      <footer className="dashboard-footer">
+        <AffiliateBanner zone="bottom_banner" assetClass={asset.asset_class} symbol={asset.symbol} />
+      </footer>
     </div>
   )
 }

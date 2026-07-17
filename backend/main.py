@@ -205,6 +205,121 @@ async def affiliate_links(symbol: Optional[str] = None, asset_class: Optional[st
 
 
 # ──────────────────────────────────────────────────────────────
+# AFFILIATE CREATIVES — swappable banners + top carousel
+# Public read endpoint for the frontend, admin CRUD for managing them.
+# ──────────────────────────────────────────────────────────────
+VALID_ZONES = {"top_carousel", "side_banner", "bottom_banner"}
+VALID_SIZES = {"leaderboard_728x90", "skyscraper_160x600", "rectangle_300x250"}
+VALID_BEHAVIORS = {"static", "fade_on_hover"}
+
+
+class CreativeInput(BaseModel):
+    zone: str
+    size_key: str
+    image_url: str
+    click_url: str
+    product_name: str
+    affiliate_name: str
+    asset_class: Optional[str] = None
+    symbol: Optional[str] = None
+    behavior: str = "static"
+    priority: int = 0
+    is_active: bool = True
+
+    def validate_choices(self):
+        if self.zone not in VALID_ZONES:
+            raise HTTPException(422, f"zone must be one of {VALID_ZONES}")
+        if self.size_key not in VALID_SIZES:
+            raise HTTPException(422, f"size_key must be one of {VALID_SIZES}")
+        if self.behavior not in VALID_BEHAVIORS:
+            raise HTTPException(422, f"behavior must be one of {VALID_BEHAVIORS}")
+
+
+@app.get("/api/creatives")
+async def get_creatives(zone: Optional[str] = None, asset_class: Optional[str] = None, symbol: Optional[str] = None):
+    """Public endpoint — the frontend calls this to render carousels/banners.
+    Returns active creatives matching the zone + scope, most specific first."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT * FROM affiliate_creatives
+            WHERE is_active = true
+              AND ($1::text IS NULL OR zone = $1)
+              AND (
+                    symbol = $2
+                 OR (asset_class = $3 AND symbol IS NULL)
+                 OR (asset_class IS NULL AND symbol IS NULL)
+              )
+            ORDER BY priority DESC, id ASC
+            """,
+            zone, symbol, asset_class,
+        )
+        return [dict(r) for r in rows]
+
+
+@app.get("/api/admin/creatives")
+async def admin_list_creatives(_=Depends(require_admin_key)):
+    """Returns EVERY creative (active + inactive) — used by the admin preview page."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("SELECT * FROM affiliate_creatives ORDER BY zone, priority DESC, id ASC")
+        return [dict(r) for r in rows]
+
+
+@app.post("/api/admin/creatives")
+async def admin_create_creative(req: CreativeInput, _=Depends(require_admin_key)):
+    req.validate_choices()
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            INSERT INTO affiliate_creatives
+                (zone, size_key, image_url, click_url, product_name, affiliate_name,
+                 asset_class, symbol, behavior, priority, is_active)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+            RETURNING *
+            """,
+            req.zone, req.size_key, req.image_url, req.click_url, req.product_name,
+            req.affiliate_name, req.asset_class, req.symbol, req.behavior, req.priority, req.is_active,
+        )
+        return dict(row)
+
+
+@app.put("/api/admin/creatives/{creative_id}")
+async def admin_update_creative(creative_id: int, req: CreativeInput, _=Depends(require_admin_key)):
+    req.validate_choices()
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            UPDATE affiliate_creatives
+            SET zone=$1, size_key=$2, image_url=$3, click_url=$4, product_name=$5,
+                affiliate_name=$6, asset_class=$7, symbol=$8, behavior=$9,
+                priority=$10, is_active=$11, updated_at=now()
+            WHERE id=$12
+            RETURNING *
+            """,
+            req.zone, req.size_key, req.image_url, req.click_url, req.product_name,
+            req.affiliate_name, req.asset_class, req.symbol, req.behavior,
+            req.priority, req.is_active, creative_id,
+        )
+        if row is None:
+            raise HTTPException(404, "Creative not found")
+        return dict(row)
+
+
+@app.delete("/api/admin/creatives/{creative_id}")
+async def admin_delete_creative(creative_id: int, _=Depends(require_admin_key)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute("DELETE FROM affiliate_creatives WHERE id=$1", creative_id)
+        if result == "DELETE 0":
+            raise HTTPException(404, "Creative not found")
+        return {"deleted": True, "id": creative_id}
+
+
+# ──────────────────────────────────────────────────────────────
 # FORECAST GATE — example of how to gate a feature behind demo account status
 # (currently a pass-through since accounts are free & auto-created)
 # ──────────────────────────────────────────────────────────────
