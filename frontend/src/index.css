@@ -545,3 +545,8 @@ dd { margin: 0; font-weight: 600; font-size: 13px; }
   background: none; border: none; color: var(--text-muted); font-size: 13px; margin-top: 16px;
   text-decoration: underline;
 }
+
+/* ---------- Admin: AI Providers page ---------- */
+.test-ok { color: var(--up); font-size: 12px; margin-top: 4px; }
+.test-fail { color: var(--down); font-size: 12px; margin-top: 4px; }
+.claude-fallback-row { background: rgba(245,166,35,0.06); }

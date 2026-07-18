@@ -205,6 +205,118 @@ async def affiliate_links(symbol: Optional[str] = None, asset_class: Optional[st
 
 
 # ──────────────────────────────────────────────────────────────
+# AI PROVIDERS — configurable failover chain (Claude is hardcoded elsewhere,
+# not stored here — see backend/services/ai_router.py)
+# ──────────────────────────────────────────────────────────────
+from backend.services.ai_router import call_ai, _call_openai_compatible
+
+VALID_PROVIDER_TYPES = {"openai", "xai_grok", "openrouter", "custom"}
+
+
+class AIProviderInput(BaseModel):
+    name: str
+    provider_type: str
+    api_base_url: str
+    api_key: str
+    model_name: str
+    priority: int = 0
+    is_active: bool = True
+
+    def validate_choices(self):
+        if self.provider_type not in VALID_PROVIDER_TYPES:
+            raise HTTPException(422, f"provider_type must be one of {VALID_PROVIDER_TYPES}")
+
+
+@app.get("/api/admin/ai-providers")
+async def admin_list_ai_providers(_=Depends(require_admin_key)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("SELECT * FROM ai_providers ORDER BY priority DESC, id ASC")
+        # Mask keys in the list view — full key only needed for the edit form,
+        # which the admin UI re-fetches; here we just show it's set.
+        return [
+            {**dict(r), "api_key": (r["api_key"][:4] + "..." if r["api_key"] else "")}
+            for r in rows
+        ]
+
+
+@app.post("/api/admin/ai-providers")
+async def admin_create_ai_provider(req: AIProviderInput, _=Depends(require_admin_key)):
+    req.validate_choices()
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            INSERT INTO ai_providers (name, provider_type, api_base_url, api_key, model_name, priority, is_active)
+            VALUES ($1,$2,$3,$4,$5,$6,$7)
+            RETURNING *
+            """,
+            req.name, req.provider_type, req.api_base_url, req.api_key,
+            req.model_name, req.priority, req.is_active,
+        )
+        return dict(row)
+
+
+@app.put("/api/admin/ai-providers/{provider_id}")
+async def admin_update_ai_provider(provider_id: int, req: AIProviderInput, _=Depends(require_admin_key)):
+    req.validate_choices()
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            UPDATE ai_providers
+            SET name=$1, provider_type=$2, api_base_url=$3, api_key=$4,
+                model_name=$5, priority=$6, is_active=$7, updated_at=now()
+            WHERE id=$8
+            RETURNING *
+            """,
+            req.name, req.provider_type, req.api_base_url, req.api_key,
+            req.model_name, req.priority, req.is_active, provider_id,
+        )
+        if row is None:
+            raise HTTPException(404, "Provider not found")
+        return dict(row)
+
+
+@app.delete("/api/admin/ai-providers/{provider_id}")
+async def admin_delete_ai_provider(provider_id: int, _=Depends(require_admin_key)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute("DELETE FROM ai_providers WHERE id=$1", provider_id)
+        if result == "DELETE 0":
+            raise HTTPException(404, "Provider not found")
+        return {"deleted": True, "id": provider_id}
+
+
+@app.post("/api/admin/ai-providers/{provider_id}/test")
+async def admin_test_ai_provider(provider_id: int, _=Depends(require_admin_key)):
+    """Sends a tiny test prompt directly to this one provider (bypassing
+    priority/failover) so you can confirm a key actually works."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT * FROM ai_providers WHERE id=$1", provider_id)
+    if row is None:
+        raise HTTPException(404, "Provider not found")
+    provider = dict(row)
+    try:
+        text = await _call_openai_compatible(provider, "Reply with exactly: OK", None)
+        return {"success": True, "response": text}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.post("/api/admin/ai-providers/test-claude-fallback")
+async def admin_test_claude_fallback(_=Depends(require_admin_key)):
+    """Confirms the hardcoded Claude fallback itself is working (tests your
+    ANTHROPIC_API_KEY env var directly, ignoring the ai_providers table)."""
+    try:
+        result = await call_ai("Reply with exactly: OK")
+        return {"success": True, "response": result["text"], "provider_used": result["provider_used"]}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ──────────────────────────────────────────────────────────────
 # ONBOARDING — 5 quick questions asked once, right after first sign-in
 # ──────────────────────────────────────────────────────────────
 class OnboardingAnswers(BaseModel):

@@ -89,7 +89,25 @@ export function adminDeleteCreative(adminKey, id) {
   return adminFetch(`/admin/creatives/${id}`, adminKey, { method: 'DELETE' })
 }
 
-// ---------- Onboarding ----------
+// ---------- Admin: manage AI providers (requires X-Admin-Key) ----------
+export function adminListAIProviders(adminKey) {
+  return adminFetch('/admin/ai-providers', adminKey)
+}
+export function adminCreateAIProvider(adminKey, provider) {
+  return adminFetch('/admin/ai-providers', adminKey, { method: 'POST', body: JSON.stringify(provider) })
+}
+export function adminUpdateAIProvider(adminKey, id, provider) {
+  return adminFetch(`/admin/ai-providers/${id}`, adminKey, { method: 'PUT', body: JSON.stringify(provider) })
+}
+export function adminDeleteAIProvider(adminKey, id) {
+  return adminFetch(`/admin/ai-providers/${id}`, adminKey, { method: 'DELETE' })
+}
+export function adminTestAIProvider(adminKey, id) {
+  return adminFetch(`/admin/ai-providers/${id}/test`, adminKey, { method: 'POST' })
+}
+export function adminTestClaudeFallback(adminKey) {
+  return adminFetch('/admin/ai-providers/test-claude-fallback', adminKey, { method: 'POST' })
+}
 export async function getOnboardingStatus(token) {
   return safeFetch('/onboarding/status', { headers: { Authorization: `Bearer ${token}` } })
 }

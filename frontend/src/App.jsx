@@ -8,6 +8,7 @@ import Onboarding from './components/Onboarding.jsx'
 import TopCarousel from './components/TopCarousel.jsx'
 import AffiliateBanner from './components/AffiliateBanner.jsx'
 import AdminCreatives from './components/AdminCreatives.jsx'
+import AdminAIProviders from './components/AdminAIProviders.jsx'
 import { getTicker, getOnboardingStatus } from './api/client.js'
 import { auth } from './firebase.js'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
@@ -22,11 +23,11 @@ export default function App() {
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
   const [onboardingChecked, setOnboardingChecked] = useState(false)
 
-  // Simple hash-based route for the admin creatives page — no router dependency needed.
-  // Visit yoursite.com/#admin to reach it.
-  const [isAdminRoute, setIsAdminRoute] = useState(window.location.hash === '#admin')
+  // Simple hash-based routes for admin pages — no router dependency needed.
+  // Visit yoursite.com/#admin for creatives, /#admin-ai for AI providers.
+  const [route, setRoute] = useState(window.location.hash)
   useEffect(() => {
-    const onHashChange = () => setIsAdminRoute(window.location.hash === '#admin')
+    const onHashChange = () => setRoute(window.location.hash)
     window.addEventListener('hashchange', onHashChange)
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
@@ -60,11 +61,10 @@ export default function App() {
 
   const filtered = filter === 'all' ? assets : assets.filter((a) => a.asset_class === filter)
 
-  // Admin route is separate from the logged-in dashboard — protected by the
-  // admin key you enter on that page, not by Firebase login.
-  if (isAdminRoute) {
-    return <AdminCreatives />
-  }
+  // Admin routes are separate from the logged-in dashboard — protected by the
+  // admin key you enter on each page, not by Firebase login.
+  if (route === '#admin') return <AdminCreatives />
+  if (route === '#admin-ai') return <AdminAIProviders />
 
   if (!authChecked) {
     return <div className="loading-screen">Loading...</div>
