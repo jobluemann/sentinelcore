@@ -6,7 +6,9 @@ import {
 } from 'firebase/auth'
 import { auth, googleProvider, facebookProvider } from '../firebase.js'
 
-const API_BASE = '/api'
+// Same environment-aware logic as api/client.js — relative path works via Vite's
+// dev proxy locally, but production builds need the full Render URL (see .env.production).
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
 async function establishSession(firebaseUser) {
   const idToken = await firebaseUser.getIdToken()
