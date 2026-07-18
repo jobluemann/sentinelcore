@@ -583,3 +583,17 @@ dd { margin: 0; font-weight: 600; font-size: 13px; }
   width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
   padding: 10px; color: var(--text); margin: 8px 0; font-family: inherit;
 }
+
+/* ---------- Raw HTML embed creatives ---------- */
+.admin-form-full-width { grid-column: 1 / -1; }
+.affiliate-banner-embed { background: none; }
+.affiliate-banner-embed :is(img, iframe) { max-width: 100%; height: auto; display: block; }
+
+/* ---------- Embed HTML live preview ---------- */
+.embed-preview-box {
+  border: 1px dashed var(--accent); border-radius: 8px; padding: 12px;
+  background: var(--bg); display: flex; align-items: center; justify-content: center;
+  min-height: 60px; overflow: auto;
+}
+.zone-embed-preview { max-width: 100%; overflow: hidden; }
+.zone-embed-preview :is(img, iframe) { max-width: 100%; height: auto; }

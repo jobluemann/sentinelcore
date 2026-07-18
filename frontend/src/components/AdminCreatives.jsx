@@ -21,8 +21,10 @@ const ASSET_CLASSES = ['', 'stock', 'crypto', 'commodity', 'forex']
 const BLANK_FORM = {
   zone: 'top_carousel',
   size_key: 'leaderboard_728x90',
+  creative_type: 'image_link',
   image_url: '',
   click_url: '',
+  embed_html: '',
   product_name: '',
   affiliate_name: '',
   asset_class: '',
@@ -70,8 +72,10 @@ export default function AdminCreatives() {
     setForm({
       zone: creative.zone,
       size_key: creative.size_key,
-      image_url: creative.image_url,
-      click_url: creative.click_url,
+      creative_type: creative.creative_type || 'image_link',
+      image_url: creative.image_url || '',
+      click_url: creative.click_url || '',
+      embed_html: creative.embed_html || '',
       product_name: creative.product_name,
       affiliate_name: creative.affiliate_name,
       asset_class: creative.asset_class || '',
@@ -95,6 +99,9 @@ export default function AdminCreatives() {
       asset_class: form.asset_class || null,
       symbol: form.symbol || null,
       priority: Number(form.priority),
+      image_url: form.creative_type === 'image_link' ? form.image_url : null,
+      click_url: form.creative_type === 'image_link' ? form.click_url : null,
+      embed_html: form.creative_type === 'raw_html' ? form.embed_html : null,
     }
     try {
       if (editingId) {
@@ -157,8 +164,11 @@ export default function AdminCreatives() {
           <span className="zone-label">Top Carousel — 728×90 (rotates through active slides)</span>
           <div className="zone-thumbs">
             {byZone('top_carousel').length === 0 && <span className="zone-empty">No creatives yet</span>}
-            {byZone('top_carousel').map((c) => (
+            {byZone('top_carousel').filter((c) => c.creative_type !== 'raw_html').map((c) => (
               <img key={c.id} src={c.image_url} alt={c.product_name} className="zone-thumb-wide" />
+            ))}
+            {byZone('top_carousel').filter((c) => c.creative_type === 'raw_html').map((c) => (
+              <div key={c.id} className="zone-embed-preview" dangerouslySetInnerHTML={{ __html: c.embed_html }} />
             ))}
           </div>
         </div>
@@ -169,8 +179,11 @@ export default function AdminCreatives() {
             <span className="zone-label">Side Banner — 160×600</span>
             <div className="zone-thumbs">
               {byZone('side_banner').length === 0 && <span className="zone-empty">No creatives yet</span>}
-              {byZone('side_banner').map((c) => (
+              {byZone('side_banner').filter((c) => c.creative_type !== 'raw_html').map((c) => (
                 <img key={c.id} src={c.image_url} alt={c.product_name} className="zone-thumb-tall" />
+              ))}
+              {byZone('side_banner').filter((c) => c.creative_type === 'raw_html').map((c) => (
+                <div key={c.id} className="zone-embed-preview" dangerouslySetInnerHTML={{ __html: c.embed_html }} />
               ))}
             </div>
           </div>
@@ -180,8 +193,11 @@ export default function AdminCreatives() {
           <span className="zone-label">Bottom Banner — 300×250</span>
           <div className="zone-thumbs">
             {byZone('bottom_banner').length === 0 && <span className="zone-empty">No creatives yet</span>}
-            {byZone('bottom_banner').map((c) => (
+            {byZone('bottom_banner').filter((c) => c.creative_type !== 'raw_html').map((c) => (
               <img key={c.id} src={c.image_url} alt={c.product_name} className="zone-thumb-square" />
+            ))}
+            {byZone('bottom_banner').filter((c) => c.creative_type === 'raw_html').map((c) => (
+              <div key={c.id} className="zone-embed-preview" dangerouslySetInnerHTML={{ __html: c.embed_html }} />
             ))}
           </div>
         </div>
@@ -199,7 +215,11 @@ export default function AdminCreatives() {
         <tbody>
           {creatives.map((c) => (
             <tr key={c.id}>
-              <td><img src={c.image_url} alt="" className="admin-table-thumb" /></td>
+              <td>
+                {c.creative_type === 'raw_html'
+                  ? <span className="muted">Embed code</span>
+                  : <img src={c.image_url} alt="" className="admin-table-thumb" />}
+              </td>
               <td>{c.product_name}<div className="muted">{c.affiliate_name}</div></td>
               <td>{ZONES.find((z) => z.key === c.zone)?.label || c.zone}</td>
               <td>{c.symbol || c.asset_class || 'All pages'}</td>
@@ -244,14 +264,44 @@ export default function AdminCreatives() {
         </label>
 
         <label>
-          Image URL
-          <input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} required />
+          Creative type
+          <select value={form.creative_type} onChange={(e) => setForm({ ...form, creative_type: e.target.value })}>
+            <option value="image_link">Image + link (I provide the image URL)</option>
+            <option value="raw_html">Raw HTML / embed code (paste the network's own snippet)</option>
+          </select>
         </label>
 
-        <label>
-          Click-through URL (your affiliate link)
-          <input value={form.click_url} onChange={(e) => setForm({ ...form, click_url: e.target.value })} required />
-        </label>
+        {form.creative_type === 'image_link' ? (
+          <>
+            <label>
+              Image URL
+              <input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} required />
+            </label>
+
+            <label>
+              Click-through URL (your affiliate link)
+              <input value={form.click_url} onChange={(e) => setForm({ ...form, click_url: e.target.value })} required />
+            </label>
+          </>
+        ) : (
+          <label className="admin-form-full-width">
+            Embed HTML (paste exactly what the affiliate network gave you — e.g. XM's own {'<a><img>'} or iframe code)
+            <textarea
+              className="admin-textarea"
+              rows={5}
+              value={form.embed_html}
+              onChange={(e) => setForm({ ...form, embed_html: e.target.value })}
+              required
+            />
+          </label>
+        )}
+
+        {form.creative_type === 'raw_html' && form.embed_html && (
+          <div className="admin-form-full-width">
+            <p className="muted" style={{ marginBottom: 6 }}>Live preview — this is exactly what will render:</p>
+            <div className="embed-preview-box" dangerouslySetInnerHTML={{ __html: form.embed_html }} />
+          </div>
+        )}
 
         <label>
           Product name

@@ -24,6 +24,15 @@ export default function AffiliateBanner({ zone, assetClass = null, symbol = null
   const sizeClass = SIZE_CLASS[creative.size_key] || 'creative-rectangle'
   const behaviorClass = creative.behavior === 'fade_on_hover' ? 'creative-fade-hover' : 'creative-static'
 
+  if (creative.creative_type === 'raw_html') {
+    return (
+      <div
+        className={`affiliate-banner ${sizeClass} ${behaviorClass} affiliate-banner-embed`}
+        dangerouslySetInnerHTML={{ __html: creative.embed_html }}
+      />
+    )
+  }
+
   return (
     <a
       href={creative.click_url}

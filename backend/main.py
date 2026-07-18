@@ -579,8 +579,10 @@ VALID_BEHAVIORS = {"static", "fade_on_hover"}
 class CreativeInput(BaseModel):
     zone: str
     size_key: str
-    image_url: str
-    click_url: str
+    creative_type: str = "image_link"   # 'image_link' | 'raw_html'
+    image_url: Optional[str] = None
+    click_url: Optional[str] = None
+    embed_html: Optional[str] = None    # used when creative_type == 'raw_html' — paste the network's own <a><img> or iframe code
     product_name: str
     affiliate_name: str
     asset_class: Optional[str] = None
@@ -596,6 +598,12 @@ class CreativeInput(BaseModel):
             raise HTTPException(422, f"size_key must be one of {VALID_SIZES}")
         if self.behavior not in VALID_BEHAVIORS:
             raise HTTPException(422, f"behavior must be one of {VALID_BEHAVIORS}")
+        if self.creative_type not in {"image_link", "raw_html"}:
+            raise HTTPException(422, "creative_type must be 'image_link' or 'raw_html'")
+        if self.creative_type == "raw_html" and not self.embed_html:
+            raise HTTPException(422, "embed_html is required when creative_type is 'raw_html'")
+        if self.creative_type == "image_link" and (not self.image_url or not self.click_url):
+            raise HTTPException(422, "image_url and click_url are required when creative_type is 'image_link'")
 
 
 @app.get("/api/creatives")
@@ -638,13 +646,13 @@ async def admin_create_creative(req: CreativeInput, _=Depends(require_admin_key)
         row = await conn.fetchrow(
             """
             INSERT INTO affiliate_creatives
-                (zone, size_key, image_url, click_url, product_name, affiliate_name,
-                 asset_class, symbol, behavior, priority, is_active)
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+                (zone, size_key, creative_type, image_url, click_url, embed_html,
+                 product_name, affiliate_name, asset_class, symbol, behavior, priority, is_active)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
             RETURNING *
             """,
-            req.zone, req.size_key, req.image_url, req.click_url, req.product_name,
-            req.affiliate_name, req.asset_class, req.symbol, req.behavior, req.priority, req.is_active,
+            req.zone, req.size_key, req.creative_type, req.image_url, req.click_url, req.embed_html,
+            req.product_name, req.affiliate_name, req.asset_class, req.symbol, req.behavior, req.priority, req.is_active,
         )
         return dict(row)
 
@@ -657,14 +665,14 @@ async def admin_update_creative(creative_id: int, req: CreativeInput, _=Depends(
         row = await conn.fetchrow(
             """
             UPDATE affiliate_creatives
-            SET zone=$1, size_key=$2, image_url=$3, click_url=$4, product_name=$5,
-                affiliate_name=$6, asset_class=$7, symbol=$8, behavior=$9,
-                priority=$10, is_active=$11, updated_at=now()
-            WHERE id=$12
+            SET zone=$1, size_key=$2, creative_type=$3, image_url=$4, click_url=$5, embed_html=$6,
+                product_name=$7, affiliate_name=$8, asset_class=$9, symbol=$10, behavior=$11,
+                priority=$12, is_active=$13, updated_at=now()
+            WHERE id=$14
             RETURNING *
             """,
-            req.zone, req.size_key, req.image_url, req.click_url, req.product_name,
-            req.affiliate_name, req.asset_class, req.symbol, req.behavior,
+            req.zone, req.size_key, req.creative_type, req.image_url, req.click_url, req.embed_html,
+            req.product_name, req.affiliate_name, req.asset_class, req.symbol, req.behavior,
             req.priority, req.is_active, creative_id,
         )
         if row is None:
