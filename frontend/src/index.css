@@ -550,3 +550,36 @@ dd { margin: 0; font-weight: 600; font-size: 13px; }
 .test-ok { color: var(--up); font-size: 12px; margin-top: 4px; }
 .test-fail { color: var(--down); font-size: 12px; margin-top: 4px; }
 .claude-fallback-row { background: rgba(245,166,35,0.06); }
+
+/* ---------- Product carousel: 5-8 item Amazon-style strip ---------- */
+.product-carousel-wrap { padding: 16px 24px; }
+.product-carousel-strip {
+  display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px;
+  scrollbar-width: thin;
+}
+.product-card {
+  flex: 0 0 180px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px; text-decoration: none; color: var(--text);
+  position: relative; transition: border-color 0.15s, transform 0.1s;
+}
+.product-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.product-card-img { width: 100%; height: 110px; object-fit: cover; border-radius: 6px; margin-bottom: 8px; }
+.product-card-title {
+  font-size: 13px; line-height: 1.3; margin-bottom: 6px; height: 34px; overflow: hidden;
+}
+.product-stars { color: var(--accent); font-size: 13px; display: block; margin-bottom: 6px; }
+.product-card-price { font-weight: 700; font-size: 15px; }
+.product-badge {
+  position: absolute; top: 8px; right: 8px; font-size: 10px; font-weight: 600;
+  padding: 3px 7px; border-radius: 4px; background: var(--accent); color: #111;
+  text-transform: uppercase; letter-spacing: 0.3px;
+}
+.badge-limited-stock { background: var(--down); color: #fff; }
+.badge-new-arrival { background: #3b82f6; color: #fff; }
+.badge-trending-now { background: #a855f7; color: #fff; }
+.product-carousel-disclaimer { font-size: 11px; color: var(--text-muted); margin-top: 8px; }
+
+.admin-textarea {
+  width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  padding: 10px; color: var(--text); margin: 8px 0; font-family: inherit;
+}

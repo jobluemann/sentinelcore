@@ -6,9 +6,12 @@ import AssetPage from './components/AssetPage.jsx'
 import Login from './components/Login.jsx'
 import Onboarding from './components/Onboarding.jsx'
 import TopCarousel from './components/TopCarousel.jsx'
+import ProductCarousel from './components/ProductCarousel.jsx'
 import AffiliateBanner from './components/AffiliateBanner.jsx'
 import AdminCreatives from './components/AdminCreatives.jsx'
 import AdminAIProviders from './components/AdminAIProviders.jsx'
+import AdminProductCarousel from './components/AdminProductCarousel.jsx'
+import AdminAffiliateAPIs from './components/AdminAffiliateAPIs.jsx'
 import { getTicker, getOnboardingStatus } from './api/client.js'
 import { auth } from './firebase.js'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
@@ -65,6 +68,8 @@ export default function App() {
   // admin key you enter on each page, not by Firebase login.
   if (route === '#admin') return <AdminCreatives />
   if (route === '#admin-ai') return <AdminAIProviders />
+  if (route === '#admin-products') return <AdminProductCarousel />
+  if (route === '#admin-apis') return <AdminAffiliateAPIs />
 
   if (!authChecked) {
     return <div className="loading-screen">Loading...</div>
@@ -98,7 +103,7 @@ export default function App() {
         </div>
       </header>
 
-      <TopCarousel />
+      <ProductCarousel />
 
       <TickerStrip items={assets} />
 

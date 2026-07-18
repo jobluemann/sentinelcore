@@ -53,6 +53,47 @@ export async function getAffiliateLinks(symbol, assetClass) {
   return data ?? MOCK_AFFILIATES[assetClass] ?? []
 }
 
+// ---------- Admin: affiliate API connections (credential storage only) ----------
+export function adminListAffiliateAPIConnections(adminKey) {
+  return adminFetch('/admin/affiliate-api-connections', adminKey)
+}
+export function adminCreateAffiliateAPIConnection(adminKey, conn) {
+  return adminFetch('/admin/affiliate-api-connections', adminKey, { method: 'POST', body: JSON.stringify(conn) })
+}
+export function adminUpdateAffiliateAPIConnection(adminKey, id, conn) {
+  return adminFetch(`/admin/affiliate-api-connections/${id}`, adminKey, { method: 'PUT', body: JSON.stringify(conn) })
+}
+export function adminDeleteAffiliateAPIConnection(adminKey, id) {
+  return adminFetch(`/admin/affiliate-api-connections/${id}`, adminKey, { method: 'DELETE' })
+}
+
+// ---------- Product carousel (5-8 item Amazon-style strip) ----------
+export async function getCarouselProducts() {
+  const data = await safeFetch('/carousel-products')
+  return data ?? []
+}
+
+export async function getSiteSetting(key) {
+  const data = await safeFetch(`/site-settings/${key}`)
+  return data?.value ?? ''
+}
+
+export function adminListCarouselProducts(adminKey) {
+  return adminFetch('/admin/carousel-products', adminKey)
+}
+export function adminCreateCarouselProduct(adminKey, product) {
+  return adminFetch('/admin/carousel-products', adminKey, { method: 'POST', body: JSON.stringify(product) })
+}
+export function adminUpdateCarouselProduct(adminKey, id, product) {
+  return adminFetch(`/admin/carousel-products/${id}`, adminKey, { method: 'PUT', body: JSON.stringify(product) })
+}
+export function adminDeleteCarouselProduct(adminKey, id) {
+  return adminFetch(`/admin/carousel-products/${id}`, adminKey, { method: 'DELETE' })
+}
+export function adminSetSiteSetting(adminKey, key, value) {
+  return adminFetch(`/admin/site-settings/${key}`, adminKey, { method: 'PUT', body: JSON.stringify({ value }) })
+}
+
 // ---------- Affiliate creatives (banners + top carousel) ----------
 export async function getCreatives(zone, assetClass, symbol) {
   const params = new URLSearchParams()

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { getAffiliateLinks } from '../api/client'
 import TopCarousel from './TopCarousel.jsx'
+import ProductCarousel from './ProductCarousel.jsx'
 import AffiliateBanner from './AffiliateBanner.jsx'
 
 export default function AssetPage({ asset, onBack }) {
@@ -18,7 +19,7 @@ export default function AssetPage({ asset, onBack }) {
     <div className="asset-page">
       <button className="back-link" onClick={onBack}>← Back to dashboard</button>
 
-      <TopCarousel assetClass={asset.asset_class} symbol={asset.symbol} />
+      <ProductCarousel />
 
       <div className="asset-page-header">
         <div>

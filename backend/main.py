@@ -13,7 +13,7 @@ import os
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import FastAPI, Depends, HTTPException, Header
+from fastapi import FastAPI, Depends, HTTPException, Header, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -202,6 +202,206 @@ async def affiliate_links(symbol: Optional[str] = None, asset_class: Optional[st
                 "SELECT * FROM affiliate_links WHERE is_active = true ORDER BY priority DESC"
             )
         return [dict(r) for r in rows]
+
+
+# ──────────────────────────────────────────────────────────────
+# AFFILIATE API CONNECTIONS — credential storage only, ready for whenever
+# a specific platform's auto-pull integration gets built (each platform's
+# API is different and needs its own separate integration work).
+# ──────────────────────────────────────────────────────────────
+import json as _json
+
+VALID_AFFILIATE_PLATFORMS = {"amazon", "ebay", "etsy", "aliexpress", "custom"}
+
+
+class AffiliateAPIConnectionInput(BaseModel):
+    platform: str
+    label: str
+    credentials: dict = {}
+    is_active: bool = True
+    notes: Optional[str] = None
+
+    def validate_choices(self):
+        if self.platform not in VALID_AFFILIATE_PLATFORMS:
+            raise HTTPException(422, f"platform must be one of {VALID_AFFILIATE_PLATFORMS}")
+
+
+@app.get("/api/admin/affiliate-api-connections")
+async def admin_list_affiliate_api_connections(_=Depends(require_admin_key)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("SELECT * FROM affiliate_api_connections ORDER BY platform, id")
+        result = []
+        for r in rows:
+            d = dict(r)
+            # Mask credential values in the list view for safety
+            creds = d.get("credentials") or {}
+            if isinstance(creds, str):
+                creds = _json.loads(creds)
+            d["credentials"] = {k: (v[:4] + "..." if v else "") for k, v in creds.items()}
+            result.append(d)
+        return result
+
+
+@app.post("/api/admin/affiliate-api-connections")
+async def admin_create_affiliate_api_connection(req: AffiliateAPIConnectionInput, _=Depends(require_admin_key)):
+    req.validate_choices()
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            INSERT INTO affiliate_api_connections (platform, label, credentials, is_active, notes)
+            VALUES ($1, $2, $3, $4, $5)
+            RETURNING *
+            """,
+            req.platform, req.label, _json.dumps(req.credentials), req.is_active, req.notes,
+        )
+        return dict(row)
+
+
+@app.put("/api/admin/affiliate-api-connections/{conn_id}")
+async def admin_update_affiliate_api_connection(conn_id: int, req: AffiliateAPIConnectionInput, _=Depends(require_admin_key)):
+    req.validate_choices()
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            UPDATE affiliate_api_connections
+            SET platform=$1, label=$2, credentials=$3, is_active=$4, notes=$5, updated_at=now()
+            WHERE id=$6
+            RETURNING *
+            """,
+            req.platform, req.label, _json.dumps(req.credentials), req.is_active, req.notes, conn_id,
+        )
+        if row is None:
+            raise HTTPException(404, "Connection not found")
+        return dict(row)
+
+
+@app.delete("/api/admin/affiliate-api-connections/{conn_id}")
+async def admin_delete_affiliate_api_connection(conn_id: int, _=Depends(require_admin_key)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute("DELETE FROM affiliate_api_connections WHERE id=$1", conn_id)
+        if result == "DELETE 0":
+            raise HTTPException(404, "Connection not found")
+        return {"deleted": True, "id": conn_id}
+
+
+# ──────────────────────────────────────────────────────────────
+# PRODUCT CAROUSEL — 5-8 item Amazon-style product strip
+# (mirrors Rudio's existing WordPress Amazon Product Rotator tool)
+# ──────────────────────────────────────────────────────────────
+class ProductCarouselInput(BaseModel):
+    title: str
+    image_url: str
+    price: float
+    currency: str = "USD"
+    affiliate_link: str
+    category: Optional[str] = None
+    rating: Optional[float] = None
+    badge: Optional[str] = None
+    disclosed_shipping: bool = False
+    priority: int = 0
+    is_active: bool = True
+
+
+@app.get("/api/carousel-products")
+async def get_carousel_products():
+    """Public endpoint. A product only appears here if BOTH is_active
+    and disclosed_shipping are true — same safety behavior as the WP tool."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT * FROM product_carousel
+            WHERE is_active = true AND disclosed_shipping = true
+            ORDER BY priority DESC, id ASC
+            """
+        )
+        return [dict(r) for r in rows]
+
+
+@app.get("/api/admin/carousel-products")
+async def admin_list_carousel_products(_=Depends(require_admin_key)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("SELECT * FROM product_carousel ORDER BY priority DESC, id ASC")
+        return [dict(r) for r in rows]
+
+
+@app.post("/api/admin/carousel-products")
+async def admin_create_carousel_product(req: ProductCarouselInput, _=Depends(require_admin_key)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            INSERT INTO product_carousel
+                (title, image_url, price, currency, affiliate_link, category,
+                 rating, badge, disclosed_shipping, priority, is_active)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+            RETURNING *
+            """,
+            req.title, req.image_url, req.price, req.currency, req.affiliate_link,
+            req.category, req.rating, req.badge, req.disclosed_shipping, req.priority, req.is_active,
+        )
+        return dict(row)
+
+
+@app.put("/api/admin/carousel-products/{product_id}")
+async def admin_update_carousel_product(product_id: int, req: ProductCarouselInput, _=Depends(require_admin_key)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            UPDATE product_carousel
+            SET title=$1, image_url=$2, price=$3, currency=$4, affiliate_link=$5,
+                category=$6, rating=$7, badge=$8, disclosed_shipping=$9,
+                priority=$10, is_active=$11, updated_at=now()
+            WHERE id=$12
+            RETURNING *
+            """,
+            req.title, req.image_url, req.price, req.currency, req.affiliate_link,
+            req.category, req.rating, req.badge, req.disclosed_shipping,
+            req.priority, req.is_active, product_id,
+        )
+        if row is None:
+            raise HTTPException(404, "Product not found")
+        return dict(row)
+
+
+@app.delete("/api/admin/carousel-products/{product_id}")
+async def admin_delete_carousel_product(product_id: int, _=Depends(require_admin_key)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute("DELETE FROM product_carousel WHERE id=$1", product_id)
+        if result == "DELETE 0":
+            raise HTTPException(404, "Product not found")
+        return {"deleted": True, "id": product_id}
+
+
+@app.get("/api/site-settings/{key}")
+async def get_site_setting(key: str):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT value FROM site_settings WHERE key=$1", key)
+        return {"key": key, "value": row["value"] if row else ""}
+
+
+@app.put("/api/admin/site-settings/{key}")
+async def set_site_setting(key: str, value: str = Body(..., embed=True), _=Depends(require_admin_key)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            INSERT INTO site_settings (key, value, updated_at)
+            VALUES ($1, $2, now())
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()
+            RETURNING *
+            """,
+            key, value,
+        )
+        return dict(row)
 
 
 # ──────────────────────────────────────────────────────────────
