@@ -14,6 +14,7 @@ from decimal import Decimal
 from typing import Optional
 
 from fastapi import FastAPI, Depends, HTTPException, Header, Body
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -203,6 +204,135 @@ async def affiliate_links(symbol: Optional[str] = None, asset_class: Optional[st
                 "SELECT * FROM affiliate_links WHERE is_active = true ORDER BY priority DESC"
             )
         return [dict(r) for r in rows]
+
+
+# ──────────────────────────────────────────────────────────────
+# EMAIL CAMPAIGNS — sent via your own domain's SMTP mailbox, queued with
+# randomized timing (see backend/services/email_sender.py). This is NOT
+# instant bulk sending — recipients get randomized send times spread over
+# a window, processed later by backend/scripts/process_email_queue.py.
+# ──────────────────────────────────────────────────────────────
+from backend.services import email_sender
+
+
+class TemplateInput(BaseModel):
+    name: str
+    category: Optional[str] = None
+    subject: str
+    body_html: str
+
+
+class AudienceFilters(BaseModel):
+    gender: Optional[str] = None
+    age_range: Optional[str] = None
+    favorite_color: Optional[str] = None
+    favorite_pet: Optional[str] = None
+    interests: list[str] = []
+    asset_preferences: list[str] = []
+
+
+class SendCampaignRequest(BaseModel):
+    name: str
+    subject: str
+    body_html: str
+    filters: AudienceFilters
+    window_hours: int = 48
+
+
+@app.get("/api/admin/email-templates")
+async def admin_list_templates(_=Depends(require_admin_key)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("SELECT * FROM email_templates ORDER BY id DESC")
+        return [dict(r) for r in rows]
+
+
+@app.post("/api/admin/email-templates")
+async def admin_create_template(req: TemplateInput, _=Depends(require_admin_key)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "INSERT INTO email_templates (name, category, subject, body_html) VALUES ($1,$2,$3,$4) RETURNING *",
+            req.name, req.category, req.subject, req.body_html,
+        )
+        return dict(row)
+
+
+@app.put("/api/admin/email-templates/{template_id}")
+async def admin_update_template(template_id: int, req: TemplateInput, _=Depends(require_admin_key)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """UPDATE email_templates SET name=$1, category=$2, subject=$3, body_html=$4, updated_at=now()
+               WHERE id=$5 RETURNING *""",
+            req.name, req.category, req.subject, req.body_html, template_id,
+        )
+        if row is None:
+            raise HTTPException(404, "Template not found")
+        return dict(row)
+
+
+@app.delete("/api/admin/email-templates/{template_id}")
+async def admin_delete_template(template_id: int, _=Depends(require_admin_key)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute("DELETE FROM email_templates WHERE id=$1", template_id)
+        if result == "DELETE 0":
+            raise HTTPException(404, "Template not found")
+        return {"deleted": True, "id": template_id}
+
+
+@app.post("/api/admin/audience/preview")
+async def admin_preview_audience(filters: AudienceFilters, _=Depends(require_admin_key)):
+    recipients = await email_sender.build_audience(filters.dict())
+    return {"count": len(recipients), "sample": recipients[:10]}
+
+
+@app.post("/api/admin/email-campaigns/send")
+async def admin_send_campaign(req: SendCampaignRequest, _=Depends(require_admin_key)):
+    campaign = await email_sender.queue_campaign(
+        req.name, req.subject, req.body_html, req.filters.dict(), req.window_hours
+    )
+    return campaign
+
+
+@app.get("/api/admin/email-campaigns")
+async def admin_list_campaigns(_=Depends(require_admin_key)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        campaigns = await conn.fetch("SELECT * FROM email_campaigns ORDER BY id DESC LIMIT 50")
+        result = []
+        for c in campaigns:
+            counts = await conn.fetchrow(
+                """
+                SELECT
+                    COUNT(*) FILTER (WHERE status = 'pending') AS pending,
+                    COUNT(*) FILTER (WHERE status = 'sent') AS sent,
+                    COUNT(*) FILTER (WHERE status = 'failed') AS failed,
+                    COUNT(*) FILTER (WHERE status = 'skipped_unsubscribed') AS skipped
+                FROM email_queue WHERE campaign_id = $1
+                """,
+                c["id"],
+            )
+            result.append({**dict(c), **dict(counts)})
+        return result
+
+
+@app.get("/api/unsubscribe")
+async def unsubscribe(token: str):
+    """Public — clicked directly from an email footer link. No login required."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT recipient_email FROM email_queue WHERE unsubscribe_token = $1", token)
+        if row is None:
+            return HTMLResponse("<h2>Invalid or expired unsubscribe link.</h2>")
+        await conn.execute(
+            "INSERT INTO email_unsubscribes (email) VALUES ($1) ON CONFLICT (email) DO NOTHING",
+            row["recipient_email"],
+        )
+        return HTMLResponse(
+            f"<h2>You've been unsubscribed.</h2><p>{row['recipient_email']} will not receive further emails from Sentinel Core.</p>"
+        )
 
 
 # ──────────────────────────────────────────────────────────────
@@ -525,6 +655,7 @@ class OnboardingAnswers(BaseModel):
     age_range: Optional[str] = None
     favorite_color: Optional[str] = None
     favorite_pet: Optional[str] = None
+    interests: list[str] = []
     asset_preferences: list[str] = []
 
 
@@ -542,19 +673,20 @@ async def save_onboarding(req: OnboardingAnswers, user=Depends(get_current_user)
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             """
-            INSERT INTO user_onboarding (user_id, email, gender, age_range, favorite_color, favorite_pet, asset_preferences)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            INSERT INTO user_onboarding (user_id, email, gender, age_range, favorite_color, favorite_pet, interests, asset_preferences)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             ON CONFLICT (user_id) DO UPDATE SET
                 gender = EXCLUDED.gender,
                 age_range = EXCLUDED.age_range,
                 favorite_color = EXCLUDED.favorite_color,
                 favorite_pet = EXCLUDED.favorite_pet,
+                interests = EXCLUDED.interests,
                 asset_preferences = EXCLUDED.asset_preferences,
                 completed_at = now()
             RETURNING *
             """,
             user["id"], user["email"], req.gender, req.age_range,
-            req.favorite_color, req.favorite_pet, req.asset_preferences,
+            req.favorite_color, req.favorite_pet, req.interests, req.asset_preferences,
         )
         return dict(row)
 

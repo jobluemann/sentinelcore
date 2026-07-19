@@ -12,6 +12,8 @@ import AdminCreatives from './components/AdminCreatives.jsx'
 import AdminAIProviders from './components/AdminAIProviders.jsx'
 import AdminProductCarousel from './components/AdminProductCarousel.jsx'
 import AdminAffiliateAPIs from './components/AdminAffiliateAPIs.jsx'
+import AdminScrollSettings from './components/AdminScrollSettings.jsx'
+import AdminEmailCampaigns from './components/AdminEmailCampaigns.jsx'
 import { getTicker, getOnboardingStatus } from './api/client.js'
 import { auth } from './firebase.js'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
@@ -25,6 +27,15 @@ export default function App() {
   const [authChecked, setAuthChecked] = useState(false)
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
   const [onboardingChecked, setOnboardingChecked] = useState(false)
+
+  // Called after a successful buy/sell so the header balance and any open
+  // trade forms reflect the new cash balance immediately, no page reload.
+  function handleTradeComplete(newBalance) {
+    setSession((prev) => prev && {
+      ...prev,
+      demo_account: { ...prev.demo_account, cash_balance: newBalance },
+    })
+  }
 
   // Simple hash-based routes for admin pages — no router dependency needed.
   // Visit yoursite.com/#admin for creatives, /#admin-ai for AI providers.
@@ -70,6 +81,8 @@ export default function App() {
   if (route === '#admin-ai') return <AdminAIProviders />
   if (route === '#admin-products') return <AdminProductCarousel />
   if (route === '#admin-apis') return <AdminAffiliateAPIs />
+  if (route === '#admin-scroll') return <AdminScrollSettings />
+  if (route === '#admin-email') return <AdminEmailCampaigns />
 
   if (!authChecked) {
     return <div className="loading-screen">Loading...</div>
@@ -85,7 +98,7 @@ export default function App() {
 
   if (pageAsset) {
     return (
-      <AssetPage asset={pageAsset} onBack={() => setPageAsset(null)} />
+      <AssetPage asset={pageAsset} session={session} onTradeComplete={handleTradeComplete} onBack={() => setPageAsset(null)} />
     )
   }
 
@@ -132,6 +145,8 @@ export default function App() {
 
       <AssetPanel
         asset={panelAsset}
+        session={session}
+        onTradeComplete={handleTradeComplete}
         onClose={() => setPanelAsset(null)}
         onViewFullPage={(a) => {
           setPanelAsset(null)

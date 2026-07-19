@@ -3,8 +3,9 @@ import { getAffiliateLinks } from '../api/client'
 import TopCarousel from './TopCarousel.jsx'
 import ProductCarousel from './ProductCarousel.jsx'
 import AffiliateBanner from './AffiliateBanner.jsx'
+import TradeForm from './TradeForm.jsx'
 
-export default function AssetPage({ asset, onBack }) {
+export default function AssetPage({ asset, session, onTradeComplete, onBack }) {
   const [affiliates, setAffiliates] = useState([])
 
   useEffect(() => {
@@ -40,6 +41,15 @@ export default function AssetPage({ asset, onBack }) {
         <section className="asset-page-chart">
           <h3>Chart</h3>
           <div className="chart-placeholder">Full historical chart goes here</div>
+        </section>
+
+        <section className="asset-page-trade">
+          <h3>Trade</h3>
+          <TradeForm
+            asset={asset}
+            cashBalance={session?.demo_account?.cash_balance}
+            onTradeComplete={onTradeComplete}
+          />
         </section>
 
         <section className="asset-page-stats">

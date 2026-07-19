@@ -31,6 +31,13 @@ const PET_OPTIONS = [
   { value: 'bird', label: 'Bird', icon: '🐦' },
 ]
 
+const INTEREST_OPTIONS = [
+  { value: 'books', label: 'Books', icon: '📚' },
+  { value: 'food', label: 'Food', icon: '🍔' },
+  { value: 'tech', label: 'Tech', icon: '💻' },
+  { value: 'news', label: 'News', icon: '📰' },
+]
+
 const ASSET_OPTIONS = [
   { value: 'stock', label: 'Stocks', icon: '📈' },
   { value: 'crypto', label: 'Crypto', icon: '🪙' },
@@ -38,7 +45,7 @@ const ASSET_OPTIONS = [
   { value: 'forex', label: 'Forex', icon: '💱' },
 ]
 
-const STEPS = ['gender', 'age_range', 'favorite_color', 'favorite_pet', 'asset_preferences']
+const STEPS = ['gender', 'age_range', 'favorite_color', 'favorite_pet', 'interests', 'asset_preferences']
 
 export default function Onboarding({ onComplete }) {
   const [stepIndex, setStepIndex] = useState(0)
@@ -47,6 +54,7 @@ export default function Onboarding({ onComplete }) {
     age_range: null,
     favorite_color: null,
     favorite_pet: null,
+    interests: [],
     asset_preferences: [],
   })
   const [saving, setSaving] = useState(false)
@@ -59,12 +67,12 @@ export default function Onboarding({ onComplete }) {
     setTimeout(() => goNext({ ...answers, [field]: value }), 200)
   }
 
-  function toggleAsset(value) {
-    const current = answers.asset_preferences
+  function toggleMulti(field, value) {
+    const current = answers[field]
     const next = current.includes(value)
       ? current.filter((v) => v !== value)
       : [...current, value]
-    setAnswers({ ...answers, asset_preferences: next })
+    setAnswers({ ...answers, [field]: next })
   }
 
   async function goNext(latestAnswers) {
@@ -166,6 +174,30 @@ export default function Onboarding({ onComplete }) {
           </QuestionStep>
         )}
 
+        {step === 'interests' && (
+          <QuestionStep title="What are you interested in?" subtitle="Pick as many as you like">
+            <div className="onboarding-options">
+              {INTEREST_OPTIONS.map((o) => (
+                <button
+                  key={o.value}
+                  className={`onboarding-tile ${answers.interests.includes(o.value) ? 'selected' : ''}`}
+                  onClick={() => toggleMulti('interests', o.value)}
+                >
+                  <span className="onboarding-icon">{o.icon}</span>
+                  <span>{o.label}</span>
+                </button>
+              ))}
+            </div>
+            <button
+              className="onboarding-continue"
+              disabled={answers.interests.length === 0}
+              onClick={() => goNext()}
+            >
+              Continue
+            </button>
+          </QuestionStep>
+        )}
+
         {step === 'asset_preferences' && (
           <QuestionStep title="What do you like to play with?" subtitle="Pick as many as you like">
             <div className="onboarding-options">
@@ -173,7 +205,7 @@ export default function Onboarding({ onComplete }) {
                 <button
                   key={o.value}
                   className={`onboarding-tile ${answers.asset_preferences.includes(o.value) ? 'selected' : ''}`}
-                  onClick={() => toggleAsset(o.value)}
+                  onClick={() => toggleMulti('asset_preferences', o.value)}
                 >
                   <span className="onboarding-icon">{o.icon}</span>
                   <span>{o.label}</span>

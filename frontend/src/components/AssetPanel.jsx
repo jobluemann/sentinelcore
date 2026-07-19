@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { getAffiliateLinks } from '../api/client'
+import TradeForm from './TradeForm.jsx'
 
-export default function AssetPanel({ asset, onClose, onViewFullPage }) {
+export default function AssetPanel({ asset, session, onTradeComplete, onClose, onViewFullPage }) {
   const [affiliates, setAffiliates] = useState([])
-  const [tab, setTab] = useState('forecast') // 'forecast' | 'affiliate'
+  const [tab, setTab] = useState('trade') // 'trade' | 'forecast' | 'affiliate'
 
   useEffect(() => {
     if (!asset) return
@@ -34,6 +35,9 @@ export default function AssetPanel({ asset, onClose, onViewFullPage }) {
         </div>
 
         <div className="panel-tabs">
+          <button className={tab === 'trade' ? 'active' : ''} onClick={() => setTab('trade')}>
+            Trade
+          </button>
           <button className={tab === 'forecast' ? 'active' : ''} onClick={() => setTab('forecast')}>
             AI Forecast
           </button>
@@ -43,6 +47,14 @@ export default function AssetPanel({ asset, onClose, onViewFullPage }) {
         </div>
 
         <div className="panel-body">
+          {tab === 'trade' && (
+            <TradeForm
+              asset={asset}
+              cashBalance={session?.demo_account?.cash_balance}
+              onTradeComplete={onTradeComplete}
+            />
+          )}
+
           {tab === 'forecast' && (
             <div className="forecast-placeholder">
               <p>AI Forecast for {asset.symbol} will appear here once the forecast engine is wired up.</p>

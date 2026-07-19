@@ -53,6 +53,29 @@ export async function getAffiliateLinks(symbol, assetClass) {
   return data ?? MOCK_AFFILIATES[assetClass] ?? []
 }
 
+// ---------- Admin: email campaigns ----------
+export function adminListTemplates(adminKey) {
+  return adminFetch('/admin/email-templates', adminKey)
+}
+export function adminCreateTemplate(adminKey, template) {
+  return adminFetch('/admin/email-templates', adminKey, { method: 'POST', body: JSON.stringify(template) })
+}
+export function adminUpdateTemplate(adminKey, id, template) {
+  return adminFetch(`/admin/email-templates/${id}`, adminKey, { method: 'PUT', body: JSON.stringify(template) })
+}
+export function adminDeleteTemplate(adminKey, id) {
+  return adminFetch(`/admin/email-templates/${id}`, adminKey, { method: 'DELETE' })
+}
+export function adminPreviewAudience(adminKey, filters) {
+  return adminFetch('/admin/audience/preview', adminKey, { method: 'POST', body: JSON.stringify(filters) })
+}
+export function adminSendCampaign(adminKey, campaign) {
+  return adminFetch('/admin/email-campaigns/send', adminKey, { method: 'POST', body: JSON.stringify(campaign) })
+}
+export function adminListCampaigns(adminKey) {
+  return adminFetch('/admin/email-campaigns', adminKey)
+}
+
 // ---------- Admin: affiliate API connections (credential storage only) ----------
 export function adminListAffiliateAPIConnections(adminKey) {
   return adminFetch('/admin/affiliate-api-connections', adminKey)
@@ -169,18 +192,25 @@ export async function getPortfolio(token) {
   })
 }
 
-export async function placeBuy(token, order) {
-  return safeFetch('/demo/buy', {
+async function tradeFetch(path, token, order) {
+  const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(order),
   })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    let message = text
+    try { message = JSON.parse(text).detail || text } catch { /* not JSON, use raw text */ }
+    throw new Error(message || `Trade failed (${res.status})`)
+  }
+  return res.json()
+}
+
+export async function placeBuy(token, order) {
+  return tradeFetch('/demo/buy', token, order)
 }
 
 export async function placeSell(token, order) {
-  return safeFetch('/demo/sell', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(order),
-  })
+  return tradeFetch('/demo/sell', token, order)
 }
