@@ -1,15 +1,30 @@
 import React, { useEffect, useState } from 'react'
-import { getAffiliateLinks } from '../api/client'
+import { getAffiliateLinks, getWatchlist, addToWatchlist, removeFromWatchlist } from '../api/client'
+import { auth } from '../firebase.js'
 import TradeForm from './TradeForm.jsx'
 
 export default function AssetPanel({ asset, session, onTradeComplete, onClose, onViewFullPage }) {
   const [affiliates, setAffiliates] = useState([])
   const [tab, setTab] = useState('trade') // 'trade' | 'forecast' | 'affiliate'
+  const [watching, setWatching] = useState(false)
 
   useEffect(() => {
     if (!asset) return
     getAffiliateLinks(asset.symbol, asset.asset_class).then(setAffiliates)
+    auth.currentUser?.getIdToken().then((idToken) =>
+      getWatchlist(idToken).then((list) => setWatching(list.some((w) => w.symbol === asset.symbol)))
+    )
   }, [asset])
+
+  async function toggleWatch() {
+    const idToken = await auth.currentUser.getIdToken()
+    if (watching) {
+      await removeFromWatchlist(idToken, asset.symbol)
+    } else {
+      await addToWatchlist(idToken, asset.symbol, asset.asset_class)
+    }
+    setWatching(!watching)
+  }
 
   if (!asset) return null
   const positive = asset.change_pct >= 0
@@ -21,7 +36,17 @@ export default function AssetPanel({ asset, session, onTradeComplete, onClose, o
 
         <div className="panel-header">
           <div>
-            <h2>{asset.symbol}</h2>
+            <h2>
+              {asset.symbol}{' '}
+              <button
+                className={`watch-star ${watching ? 'active' : ''}`}
+                onClick={toggleWatch}
+                title={watching ? 'Remove from monitoring' : 'Mark for monitoring'}
+                aria-label={watching ? 'Remove from monitoring' : 'Mark for monitoring'}
+              >
+                {watching ? '★' : '☆'}
+              </button>
+            </h2>
             <p className="asset-name">{asset.name}</p>
           </div>
           <div className="panel-price-block">

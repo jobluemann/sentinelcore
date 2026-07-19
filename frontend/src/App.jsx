@@ -3,6 +3,8 @@ import TickerStrip from './components/TickerStrip.jsx'
 import AssetCard from './components/AssetCard.jsx'
 import AssetPanel from './components/AssetPanel.jsx'
 import AssetPage from './components/AssetPage.jsx'
+import Home from './components/Home.jsx'
+import CategoryPage from './components/CategoryPage.jsx'
 import Login from './components/Login.jsx'
 import Onboarding from './components/Onboarding.jsx'
 import TopCarousel from './components/TopCarousel.jsx'
@@ -27,6 +29,9 @@ export default function App() {
   const [authChecked, setAuthChecked] = useState(false)
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
   const [onboardingChecked, setOnboardingChecked] = useState(false)
+  const [view, setView] = useState('home') // 'home' | 'category'
+  const [viewCategory, setViewCategory] = useState(null)
+  const [idToken, setIdToken] = useState(null)
 
   // Called after a successful buy/sell so the header balance and any open
   // trade forms reflect the new cash balance immediately, no page reload.
@@ -73,6 +78,11 @@ export default function App() {
     return () => { cancelled = true }
   }, [session])
 
+  useEffect(() => {
+    if (!session) { setIdToken(null); return }
+    auth.currentUser?.getIdToken().then(setIdToken)
+  }, [session])
+
   const filtered = filter === 'all' ? assets : assets.filter((a) => a.asset_class === filter)
 
   // Admin routes are separate from the logged-in dashboard — protected by the
@@ -102,6 +112,17 @@ export default function App() {
     )
   }
 
+  if (view === 'category' && viewCategory) {
+    return (
+      <CategoryPage
+        assetClass={viewCategory}
+        assets={assets}
+        onBack={() => setView('home')}
+        onOpenAsset={setPanelAsset}
+      />
+    )
+  }
+
   return (
     <div className="app">
       <header className="app-header">
@@ -120,27 +141,14 @@ export default function App() {
 
       <ProductCarousel />
 
-      <div className="filter-bar">
-        {['all', 'stock', 'crypto', 'commodity', 'forex'].map((f) => (
-          <button key={f} className={filter === f ? 'active' : ''} onClick={() => setFilter(f)}>
-            {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
-          </button>
-        ))}
-      </div>
-
-      <div className="dashboard-layout">
-        <main className="asset-grid">
-          {filtered.map((asset) => (
-            <AssetCard key={asset.symbol} asset={asset} onClick={setPanelAsset} />
-          ))}
-        </main>
-        <aside className="side-rail">
-          <AffiliateBanner zone="side_banner" assetClass={filter === 'all' ? null : filter} />
-        </aside>
-      </div>
+      <Home
+        idToken={idToken}
+        onSelectCategory={(cat) => { setViewCategory(cat); setView('category') }}
+        onOpenAsset={setPanelAsset}
+      />
 
       <footer className="dashboard-footer">
-        <AffiliateBanner zone="bottom_banner" assetClass={filter === 'all' ? null : filter} />
+        <AffiliateBanner zone="bottom_banner" />
       </footer>
 
       <AssetPanel

@@ -82,6 +82,73 @@ async def create_session(user=Depends(get_current_user)):
 
 
 # ──────────────────────────────────────────────────────────────
+# WATCHLIST — mark assets "for monitoring" without holding them.
+# Powers the homepage redesign: only watched + held assets show there.
+# ──────────────────────────────────────────────────────────────
+class WatchlistInput(BaseModel):
+    symbol: str
+    asset_class: str
+
+
+@app.get("/api/watchlist")
+async def get_watchlist(user=Depends(get_current_user)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT p.symbol, p.asset_class, p.name, p.price, p.change_pct, p.spread_pct
+            FROM watchlist w
+            JOIN price_data p ON p.symbol = w.symbol
+            WHERE w.user_id = $1
+            ORDER BY w.added_at DESC
+            """,
+            user["id"],
+        )
+        return [dict(r) for r in rows]
+
+
+@app.post("/api/watchlist")
+async def add_to_watchlist(req: WatchlistInput, user=Depends(get_current_user)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO watchlist (user_id, symbol, asset_class)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (user_id, symbol) DO NOTHING
+            """,
+            user["id"], req.symbol, req.asset_class,
+        )
+        return {"added": True, "symbol": req.symbol}
+
+
+@app.delete("/api/watchlist/{symbol}")
+async def remove_from_watchlist(symbol: str, user=Depends(get_current_user)):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM watchlist WHERE user_id = $1 AND symbol = $2", user["id"], symbol)
+        return {"removed": True, "symbol": symbol}
+
+
+@app.get("/api/ticker/top-performers")
+async def get_top_performers():
+    """Public — biggest % gainer overall, plus one per asset class, for the homepage."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT DISTINCT ON (asset_class) symbol, asset_class, name, price, change_pct
+            FROM price_data
+            WHERE is_curated = true
+            ORDER BY asset_class, change_pct DESC
+            """
+        )
+        by_class = {r["asset_class"]: dict(r) for r in rows}
+        overall = max(rows, key=lambda r: r["change_pct"], default=None)
+        return {"overall": dict(overall) if overall else None, "by_class": by_class}
+
+
+# ──────────────────────────────────────────────────────────────
 # DEMO TRADING
 # ──────────────────────────────────────────────────────────────
 class TradeRequest(BaseModel):

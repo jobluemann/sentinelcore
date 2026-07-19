@@ -186,6 +186,35 @@ export async function saveOnboarding(token, answers) {
   return res.json()
 }
 
+// ---------- Watchlist ----------
+export async function getWatchlist(token) {
+  const res = await fetch(`${BASE}/watchlist`, { headers: { Authorization: `Bearer ${token}` } })
+  if (!res.ok) return []
+  return res.json()
+}
+
+export async function addToWatchlist(token, symbol, assetClass) {
+  const res = await fetch(`${BASE}/watchlist`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ symbol, asset_class: assetClass }),
+  })
+  return res.ok
+}
+
+export async function removeFromWatchlist(token, symbol) {
+  const res = await fetch(`${BASE}/watchlist/${symbol}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  return res.ok
+}
+
+export async function getTopPerformers() {
+  const data = await safeFetch('/ticker/top-performers')
+  return data ?? { overall: null, by_class: {} }
+}
+
 export async function getPortfolio(token) {
   return safeFetch('/demo/portfolio', {
     headers: { Authorization: `Bearer ${token}` },
