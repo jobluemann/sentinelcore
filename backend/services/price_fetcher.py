@@ -9,6 +9,12 @@ Sources:
   - commodities -> yfinance (futures tickers, e.g. GC=F, CL=F)
   - forex       -> yfinance (pairs, e.g. EURUSD=X)
   - crypto      -> CoinGecko (more reliable than yfinance for crypto)
+
+NOTE: This file was written without live network access to Yahoo Finance
+or CoinGecko (sandboxed dev environment only allows a fixed domain
+allowlist). The HTTP/library calls are correct and tested for shape, but
+run a real fetch on your own machine before trusting it in production:
+  python -m backend.services.price_fetcher --once
 """
 import asyncio
 import argparse
@@ -43,6 +49,21 @@ async def fetch_yfinance_symbol(symbol: str) -> Optional[dict]:
         prev_close = float(getattr(info, "previous_close", None) or 0)
         change_pct = ((price - prev_close) / prev_close * 100) if prev_close else 0.0
 
+        # Bid/ask isn't in fast_info — best-effort separate lookup via the
+        # slower .info dict. Wrapped on its own so a failure here (common —
+        # not every instrument publishes live bid/ask, especially futures)
+        # never takes down the price update itself.
+        bid = ask = spread_pct = None
+        try:
+            full_info = ticker.info
+            raw_bid = full_info.get("bid")
+            raw_ask = full_info.get("ask")
+            if raw_bid and raw_ask and raw_bid > 0:
+                bid, ask = float(raw_bid), float(raw_ask)
+                spread_pct = round((ask - bid) / bid * 100, 4)
+        except Exception as e:
+            print(f"[price_fetcher] bid/ask unavailable for {symbol}: {e}")
+
         return {
             "symbol": symbol,
             "price": price,
@@ -50,6 +71,9 @@ async def fetch_yfinance_symbol(symbol: str) -> Optional[dict]:
             "volume": int(getattr(info, "last_volume", None) or 0) or None,
             "week52_low": float(getattr(info, "year_low", None) or 0) or None,
             "week52_high": float(getattr(info, "year_high", None) or 0) or None,
+            "bid": bid,
+            "ask": ask,
+            "spread_pct": spread_pct,
         }
     except Exception as e:
         print(f"[price_fetcher] yfinance failed for {symbol}: {e}")
@@ -92,6 +116,9 @@ async def fetch_coingecko_batch(symbols: list[str]) -> dict[str, dict]:
             "volume": int(values.get("usd_24h_vol", 0) or 0) or None,
             "week52_low": None,
             "week52_high": None,
+            "bid": None,   # CoinGecko's free simple/price endpoint doesn't provide bid/ask
+            "ask": None,
+            "spread_pct": None,
         }
     return results
 
@@ -138,12 +165,16 @@ async def refresh_all_curated():
                 SET price = $1, change_pct = $2, volume = $3,
                     week52_low = COALESCE($4, week52_low),
                     week52_high = COALESCE($5, week52_high),
+                    bid_price = $6, ask_price = $7, spread_pct = $8,
                     fetched_at = now()
-                WHERE symbol = $6
+                WHERE symbol = $9
                 """,
                 Decimal(str(u["price"])), Decimal(str(u["change_pct"])), u["volume"],
                 Decimal(str(u["week52_low"])) if u["week52_low"] else None,
                 Decimal(str(u["week52_high"])) if u["week52_high"] else None,
+                Decimal(str(u["bid"])) if u.get("bid") else None,
+                Decimal(str(u["ask"])) if u.get("ask") else None,
+                Decimal(str(u["spread_pct"])) if u.get("spread_pct") else None,
                 u["symbol"],
             )
 

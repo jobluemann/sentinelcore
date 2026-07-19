@@ -16,6 +16,9 @@ export default function TickerStrip({ items }) {
             <span className={`ticker-change ${item.change_pct >= 0 ? 'up' : 'down'}`}>
               {item.change_pct >= 0 ? '▲' : '▼'} {Math.abs(item.change_pct).toFixed(2)}%
             </span>
+            <span className="ticker-spread">
+              {item.spread_pct != null ? `Spread ${Number(item.spread_pct).toFixed(3)}%` : 'Spread N/A'}
+            </span>
           </span>
         ))}
       </div>

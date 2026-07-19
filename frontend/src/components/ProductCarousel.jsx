@@ -22,12 +22,15 @@ export default function ProductCarousel() {
 
   if (products.length === 0) return null
 
+  // Duplicate the list so the scroll loop feels seamless, same technique as TickerStrip
+  const loopProducts = products.length > 1 ? [...products, ...products] : products
+
   return (
     <div className="product-carousel-wrap">
       <div className="product-carousel-strip">
-        {products.map((p) => (
+        {loopProducts.map((p, i) => (
           <a
-            key={p.id}
+            key={`${p.id}-${i}`}
             href={p.affiliate_link}
             target="_blank"
             rel="noopener noreferrer sponsored"

@@ -103,9 +103,9 @@ export default function App() {
         </div>
       </header>
 
-      <ProductCarousel />
-
       <TickerStrip items={assets} />
+
+      <ProductCarousel />
 
       <div className="filter-bar">
         {['all', 'stock', 'crypto', 'commodity', 'forex'].map((f) => (

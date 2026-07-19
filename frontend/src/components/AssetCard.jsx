@@ -44,6 +44,9 @@ export default function AssetCard({ asset, onClick }) {
           {positive ? '▲' : '▼'} {Math.abs(asset.change_pct).toFixed(2)}%
         </span>
       </div>
+      <div className="asset-card-spread">
+        {asset.spread_pct != null ? `Spread: ${Number(asset.spread_pct).toFixed(3)}%` : 'Spread: N/A'}
+      </div>
     </button>
   )
 }

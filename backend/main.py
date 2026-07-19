@@ -172,7 +172,8 @@ async def get_ticker():
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             """
-            SELECT symbol, asset_class, name, price, change_pct, fetched_at
+            SELECT symbol, asset_class, name, price, change_pct, fetched_at,
+                   bid_price, ask_price, spread_pct
             FROM price_data
             WHERE is_curated = true
             ORDER BY ticker_order ASC NULLS LAST
